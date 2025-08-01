@@ -14,13 +14,19 @@ package opaque
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha512"
+	"io"
+	"log"
 
 	"github.com/bytemare/ecc"
+	"github.com/bytemare/ksf"
 	"github.com/claucece/opaque-check/internal"
 	"github.com/claucece/opaque-check/internal/encoding"
 	"github.com/claucece/opaque-check/internal/keyrecovery"
 	"github.com/claucece/opaque-check/internal/oprf"
 	"github.com/claucece/opaque-check/internal/tag"
+	"golang.org/x/crypto/hkdf"
 )
 
 const (
@@ -85,7 +91,7 @@ func concat3(a, b, c []byte) []byte {
 // TODO: weak password -> new issue, offline check
 func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credentialIdentifier, oprfSeed []byte, serverPublicKey []byte, serverIdentity []byte, clientIdentity []byte) bool {
 	env := &keyrecovery.Envelope{}
-	envelope, err := env.DeserializeEnvelope(record.Envelope, c.conf)
+	envelope, err := env.DeserializeEnvelope(record.Envelope)
 	if err != nil {
 		return false
 	}
@@ -95,21 +101,36 @@ func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credential
 
 	// Calculate the per-client server key
 	// TODO: we might be able to run for all clients
-	seedSk := s.conf.KDF.Expand(
+	r := hkdf.Expand(
+		sha512.New,
 		oprfSeed,
 		suffixString(credentialIdentifier, tag.ExpandOPRF),
-		seedLength,
 	)
-	ku := s.conf.OPRF.DeriveKey(seedSk, []byte(tag.DeriveKeyPair))
-	m2 := s.conf.OPRF.Evaluate(ku, m1)
+	seedSk := make([]byte, seedLength)
+	if _, err := io.ReadFull(r, seedSk); err != nil {
+		log.Fatalf("hkdf expand failed: %v", err)
+	}
+
+	ku := oprf.DeriveKey(seedSk, []byte(tag.DeriveKeyPair))
+	m2 := oprf.Evaluate(ku, m1)
 
 	// Fake last client message
 	m3 := c.OPRF.Finalize(m2)
 
-	stretched := c.conf.KSF.Harden(m3, nil, c.conf.Group.ElementLength()) // if random-salt, it will be though
-	prk := c.conf.KDF.Extract([]byte(""), concat(m3, stretched))
-	seed := c.conf.KDF.Expand(prk, suffixString(envelope.Nonce, tag.ExpandPrivateKey), seedLength)
-	_, pku := oprf.IDFromGroup(c.conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	stretched := ksf.Argon2id.Harden(m3, nil, c.conf.Group.ElementLength()) // if random-salt, it will be though
+	prk := hkdf.Extract(sha512.New, concat(m3, stretched), []byte(""))
+
+	r1 := hkdf.Expand(
+		sha512.New,
+		prk,
+		suffixString(envelope.Nonce, tag.ExpandPrivateKey),
+	)
+	seed := make([]byte, seedLength)
+	if _, err := io.ReadFull(r1, seed); err != nil {
+		log.Fatalf("hkdf expand failed: %v", err)
+	}
+
+	_, pku := oprf.DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 	if clientIdentity == nil {
 		clientIdentity = pku.Encode()
 	}
@@ -123,8 +144,20 @@ func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credential
 		encoding.EncodeVector(clientIdentity),
 		encoding.EncodeVector(serverIdentity),
 	)
-	authKey := c.conf.KDF.Expand(prk, suffixString(envelope.Nonce, tag.AuthKey), c.conf.KDF.Size())
-	authTag := c.conf.MAC.MAC(authKey, concat(envelope.Nonce, ctc)) // build the credentials
+
+	r2 := hkdf.Expand(
+		sha512.New,
+		prk,
+		suffixString(envelope.Nonce, tag.AuthKey),
+	)
+	authKey := make([]byte, c.conf.KDF.Size())
+	if _, err := io.ReadFull(r2, authKey); err != nil {
+		log.Fatalf("hkdf expand failed: %v", err)
+	}
+
+	hm := hmac.New(sha512.New, authKey)
+	_, _ = hm.Write(concat(envelope.Nonce, ctc))
+	authTag := hm.Sum(nil)
 
 	// TODO: needs constant time
 	if bytes.Equal(envelope.AuthTag, authTag) {

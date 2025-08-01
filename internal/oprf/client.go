@@ -31,10 +31,10 @@ func (c *Client) Blind(input []byte, blind *ecc.Scalar) *ecc.Element {
 	if blind != nil {
 		c.blind = blind.Copy()
 	} else {
-		c.blind = c.Group().NewScalar().Random()
+		c.blind = ecc.Ristretto255Sha512.NewScalar().Random()
 	}
 
-	p := c.Group().HashToGroup(input, c.dst(tag.OPRFPointPrefix))
+	p := ecc.Ristretto255Sha512.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
 	if p.IsIdentity() {
 		panic(errInvalidInput)
 	}
@@ -44,12 +44,12 @@ func (c *Client) Blind(input []byte, blind *ecc.Scalar) *ecc.Element {
 	return p.Multiply(c.blind)
 }
 
-func (c *Client) hashTranscript(input, unblinded []byte) []byte {
+func hashTranscript(input, unblinded []byte) []byte {
 	encInput := encoding.EncodeVector(input)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
 
-	return c.hash(encInput, encElement, encDST)
+	return hashSha512(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
@@ -57,5 +57,5 @@ func (c *Client) Finalize(evaluation *ecc.Element) []byte {
 	invert := c.blind.Copy().Invert()
 	u := evaluation.Copy().Multiply(invert).Encode()
 
-	return c.hashTranscript(c.input, u)
+	return hashTranscript(c.input, u)
 }

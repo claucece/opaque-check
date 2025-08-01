@@ -21,6 +21,9 @@ const (
 	// NonceLength is the default length used for nonces.
 	NonceLength = 32
 
+	// MACLength is the length used for macs.
+	MACLength = 64
+
 	// SeedLength is the default length used for seeds.
 	SeedLength = oprf.SeedLength
 )

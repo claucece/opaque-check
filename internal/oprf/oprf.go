@@ -11,7 +11,7 @@
 package oprf
 
 import (
-	"crypto"
+	"crypto/sha512"
 
 	"github.com/bytemare/ecc"
 
@@ -29,9 +29,6 @@ const (
 	// Ristretto255Sha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
 	Ristretto255Sha512 Identifier = "ristretto255-SHA512"
 
-	// Decaf448Sha512 is the OPRF cipher suite of the Decaf448 group and SHA-512.
-	// decaf448Sha512 Identifier = "decaf448-SHAKE256".
-
 	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
 	P256Sha256 Identifier = "P256-SHA256"
 
@@ -46,21 +43,15 @@ const (
 )
 
 func (i Identifier) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), i.contextString())
+	return encoding.Concat([]byte(prefix), []byte("ristretto255-SHA512"))
 }
 
-func (i Identifier) contextString() []byte {
-	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
+func contextString() []byte {
+	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte("ristretto255-SHA512"))
 }
 
-func (i Identifier) hash(input ...[]byte) []byte {
-	h := map[Identifier]crypto.Hash{
-		Ristretto255Sha512: crypto.SHA512,
-		P256Sha256:         crypto.SHA256,
-		P384Sha384:         crypto.SHA384,
-		P521Sha512:         crypto.SHA512,
-	}[i].New()
-	h.Reset()
+func hashSha512(input ...[]byte) []byte {
+	h := sha512.New()
 
 	for _, i := range input {
 		_, _ = h.Write(i)
@@ -99,8 +90,8 @@ func (i Identifier) Group() ecc.Group {
 }
 
 // DeriveKey returns a scalar deterministically generated from the input.
-func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
-	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), i.contextString())
+func DeriveKey(seed, info []byte) *ecc.Scalar {
+	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
 	var (
@@ -113,7 +104,7 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 			panic("DeriveKeyPairError")
 		}
 
-		s = i.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
+		s = ecc.Ristretto255Sha512.HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
 		counter++
 	}
 
@@ -121,9 +112,9 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 }
 
 // DeriveKeyPair returns a valid keypair deterministically generated from the input.
-func (i Identifier) DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
-	sk := i.DeriveKey(seed, info)
-	return sk, i.Group().Base().Multiply(sk)
+func DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
+	sk := DeriveKey(seed, info)
+	return sk, ecc.Ristretto255Sha512.Base().Multiply(sk)
 }
 
 // Client returns an OPRF client.

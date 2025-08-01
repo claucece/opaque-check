@@ -42,14 +42,14 @@ func (e *Envelope) Serialize() []byte {
 
 // DeserializeEnvelope parses the byte slice back into an Envelope.
 // It assumes the nonce and auth tag are of known fixed lengths.
-func (e *Envelope) DeserializeEnvelope(data []byte, c *internal.Configuration) (*Envelope, error) {
-	if len(data) != internal.NonceLength+c.MAC.Size() {
+func (e *Envelope) DeserializeEnvelope(data []byte) (*Envelope, error) {
+	if len(data) != internal.NonceLength+internal.MACLength {
 		return nil, fmt.Errorf("invalid envelope length")
 	}
 
 	env := &Envelope{
 		Nonce:   data[:internal.NonceLength],
-		AuthTag: data[internal.NonceLength : internal.NonceLength+c.MAC.Size()],
+		AuthTag: data[internal.NonceLength : internal.NonceLength+internal.MACLength],
 	}
 
 	return env, nil
@@ -82,5 +82,5 @@ func deriveDiffieHellmanKeyPair(
 	randomizedPassword, nonce []byte,
 ) (*ecc.Scalar, *ecc.Element) {
 	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	return oprf.DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
