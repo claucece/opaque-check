@@ -13,12 +13,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/ecc"
-
 	"github.com/claucece/opaque-check/internal"
 	"github.com/claucece/opaque-check/internal/encoding"
-	"github.com/claucece/opaque-check/internal/oprf"
-	"github.com/claucece/opaque-check/internal/tag"
 )
 
 var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
@@ -55,11 +51,6 @@ func (e *Envelope) DeserializeEnvelope(data []byte) (*Envelope, error) {
 	return env, nil
 }
 
-func authTag(conf *internal.Configuration, randomizedPassword, nonce, ctc []byte) []byte {
-	authKey := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
-	return conf.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
-}
-
 // cleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
 func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serverIdentity []byte) []byte {
 	if clientIdentity == nil {
@@ -75,12 +66,4 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serv
 		encoding.EncodeVector(serverIdentity),
 		encoding.EncodeVector(clientIdentity),
 	)
-}
-
-func deriveDiffieHellmanKeyPair(
-	conf *internal.Configuration,
-	randomizedPassword, nonce []byte,
-) (*ecc.Scalar, *ecc.Element) {
-	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	return oprf.DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }

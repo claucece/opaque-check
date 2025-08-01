@@ -22,7 +22,6 @@ var errInvalidInput = errors.New("invalid input - OPRF input deterministically m
 // Client implements the OPRF client and holds its state.
 type Client struct {
 	blind *ecc.Scalar
-	Identifier
 	input []byte
 }
 
@@ -34,7 +33,7 @@ func (c *Client) Blind(input []byte, blind *ecc.Scalar) *ecc.Element {
 		c.blind = ecc.Ristretto255Sha512.NewScalar().Random()
 	}
 
-	p := ecc.Ristretto255Sha512.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
+	p := ecc.Ristretto255Sha512.HashToGroup(input, encoding.Concat([]byte(tag.OPRFPointPrefix), encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte("ristretto255-SHA512"))))
 	if p.IsIdentity() {
 		panic(errInvalidInput)
 	}

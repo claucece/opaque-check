@@ -21,7 +21,6 @@ import (
 
 	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
-	"github.com/claucece/opaque-check/internal"
 	"github.com/claucece/opaque-check/internal/encoding"
 	"github.com/claucece/opaque-check/internal/keyrecovery"
 	"github.com/claucece/opaque-check/internal/oprf"
@@ -33,24 +32,6 @@ const (
 	// seedLength is the default length used for seeds.
 	seedLength = oprf.SeedLength
 )
-
-// Deserializer exposes the message deserialization functions.
-type Deserializer struct {
-	conf *internal.Configuration
-}
-
-// Server represents an abridged OPAQUE Server, exposing its functions and holding its state.
-type Server struct {
-	Deserialize *Deserializer
-	conf        *internal.Configuration
-}
-
-// Client represents an abridged OPAQUE Client, exposing its functions and holding its state.
-type Client struct {
-	Deserialize *Deserializer
-	OPRF        *oprf.Client
-	conf        *internal.Configuration
-}
 
 // RegistrationRecord represents the client record sent as the last registration message by the client to the server.
 type RegistrationRecord struct {
@@ -89,15 +70,16 @@ func concat3(a, b, c []byte) []byte {
 
 // TODO: empty password -> for the issue
 // TODO: weak password -> new issue, offline check
-func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credentialIdentifier, oprfSeed []byte, serverPublicKey []byte, serverIdentity []byte, clientIdentity []byte) bool {
+func EnvelopeCheck(record *RegistrationRecord, credentialIdentifier, oprfSeed []byte, serverPublicKey []byte, serverIdentity []byte, clientIdentity []byte) bool {
 	env := &keyrecovery.Envelope{}
 	envelope, err := env.DeserializeEnvelope(record.Envelope)
 	if err != nil {
 		return false
 	}
 
+	client := &oprf.Client{}
 	// Fake first client message
-	m1 := c.OPRF.Blind([]byte(""), nil) // random blind
+	m1 := client.Blind([]byte(""), nil) // random blind
 
 	// Calculate the per-client server key
 	// TODO: we might be able to run for all clients
@@ -115,9 +97,9 @@ func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credential
 	m2 := oprf.Evaluate(ku, m1)
 
 	// Fake last client message
-	m3 := c.OPRF.Finalize(m2)
+	m3 := client.Finalize(m2)
 
-	stretched := ksf.Argon2id.Harden(m3, nil, c.conf.Group.ElementLength()) // if random-salt, it will be though
+	stretched := ksf.Argon2id.Harden(m3, nil, ecc.Ristretto255Sha512.ElementLength()) // if random-salt, it will be though
 	prk := hkdf.Extract(sha512.New, concat(m3, stretched), []byte(""))
 
 	r1 := hkdf.Expand(
@@ -150,7 +132,7 @@ func (s *Server) EnvelopeCheck(record *RegistrationRecord, c *Client, credential
 		prk,
 		suffixString(envelope.Nonce, tag.AuthKey),
 	)
-	authKey := make([]byte, c.conf.KDF.Size())
+	authKey := make([]byte, 64)
 	if _, err := io.ReadFull(r2, authKey); err != nil {
 		log.Fatalf("hkdf expand failed: %v", err)
 	}

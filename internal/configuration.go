@@ -10,10 +10,6 @@
 package internal
 
 import (
-	"errors"
-
-	"github.com/bytemare/ecc"
-
 	"github.com/claucece/opaque-check/internal/oprf"
 )
 
@@ -27,19 +23,3 @@ const (
 	// SeedLength is the default length used for seeds.
 	SeedLength = oprf.SeedLength
 )
-
-// ErrConfigurationInvalidLength happens when deserializing a configuration of invalid length.
-var ErrConfigurationInvalidLength = errors.New("invalid encoded configuration length")
-
-// Configuration is the internal representation of the instance runtime parameters.
-type Configuration struct {
-	KDF          *KDF
-	MAC          *Mac
-	Hash         *Hash
-	KSF          *KSF
-	OPRF         oprf.Identifier
-	Context      []byte
-	NonceLen     int
-	EnvelopeSize int
-	Group        ecc.Group
-}

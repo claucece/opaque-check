@@ -26,25 +26,8 @@ const SeedLength = 32
 type Identifier string
 
 const (
-	// Ristretto255Sha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
-	Ristretto255Sha512 Identifier = "ristretto255-SHA512"
-
-	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
-	P256Sha256 Identifier = "P256-SHA256"
-
-	// P384Sha384 is the OPRF cipher suite of the NIST P-384 group and SHA-384.
-	P384Sha384 Identifier = "P384-SHA384"
-
-	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
-	P521Sha512 Identifier = "P521-SHA512"
-
-	nbIDs                 = 4
 	maxDeriveKeyPairTries = 255
 )
-
-func (i Identifier) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), []byte("ristretto255-SHA512"))
-}
 
 func contextString() []byte {
 	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte("ristretto255-SHA512"))
@@ -58,35 +41,6 @@ func hashSha512(input ...[]byte) []byte {
 	}
 
 	return h.Sum(nil)
-}
-
-// Available returns whether the Identifier has been registered of not.
-func (i Identifier) Available() bool {
-	// Check for invalid identifiers
-	return i == Ristretto255Sha512 ||
-		i == P256Sha256 ||
-		i == P384Sha384 ||
-		i == P521Sha512
-}
-
-// IDFromGroup returns the OPRF identifier corresponding to the input ecc.
-func IDFromGroup(g ecc.Group) Identifier {
-	return map[ecc.Group]Identifier{
-		ecc.Ristretto255Sha512: Ristretto255Sha512,
-		ecc.P256Sha256:         P256Sha256,
-		ecc.P384Sha384:         P384Sha384,
-		ecc.P521Sha512:         P521Sha512,
-	}[g]
-}
-
-// Group returns the Group identifier for the cipher suite.
-func (i Identifier) Group() ecc.Group {
-	return map[Identifier]ecc.Group{
-		Ristretto255Sha512: ecc.Ristretto255Sha512,
-		P256Sha256:         ecc.P256Sha256,
-		P384Sha384:         ecc.P384Sha384,
-		P521Sha512:         ecc.P521Sha512,
-	}[i]
 }
 
 // DeriveKey returns a scalar deterministically generated from the input.
@@ -115,13 +69,4 @@ func DeriveKey(seed, info []byte) *ecc.Scalar {
 func DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
 	sk := DeriveKey(seed, info)
 	return sk, ecc.Ristretto255Sha512.Base().Multiply(sk)
-}
-
-// Client returns an OPRF client.
-func (i Identifier) Client() *Client {
-	return &Client{
-		Identifier: i,
-		input:      nil,
-		blind:      nil,
-	}
 }
