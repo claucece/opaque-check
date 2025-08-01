@@ -70,7 +70,7 @@ func concat3(a, b, c []byte) []byte {
 
 // TODO: empty password -> for the issue
 // TODO: weak password -> new issue, offline check
-func EnvelopeCheck(record *RegistrationRecord, credentialIdentifier, oprfSeed []byte, serverPublicKey []byte, serverIdentity []byte, clientIdentity []byte) bool {
+func EnvelopeCheck(record *RegistrationRecord, credentialIdentifier, oprfSeed, serverPublicKey, serverIdentity, clientIdentity []byte) bool {
 	env := &keyrecovery.Envelope{}
 	envelope, err := env.DeserializeEnvelope(record.Envelope)
 	if err != nil {
