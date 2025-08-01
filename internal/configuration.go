@@ -10,9 +10,7 @@
 package internal
 
 import (
-	"crypto/rand"
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -41,15 +39,4 @@ type Configuration struct {
 	NonceLen     int
 	EnvelopeSize int
 	Group        ecc.Group
-}
-
-// RandomBytes returns random bytes of length len (wrapper for crypto/rand).
-func RandomBytes(length int) []byte {
-	r := make([]byte, length)
-	if _, err := rand.Read(r); err != nil {
-		// We can as well not panic and try again in a loop and a counter to stop.
-		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
-	}
-
-	return r
 }
