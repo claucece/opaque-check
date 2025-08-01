@@ -30,42 +30,11 @@ const (
 	// AuthKey is the envelope's MAC key's KDF dst.
 	AuthKey = "AuthKey"
 
-	// ExportKey is the export key's KDF dst.
-	ExportKey = "ExportKey"
-
-	// MaskingKey is the masking key's creation KDF dst.
-	MaskingKey = "MaskingKey"
-
 	// DeriveDiffieHellmanKeyPair is the private key hash-to-scalar dst.
 	DeriveDiffieHellmanKeyPair = "OPAQUE-DeriveDiffieHellmanKeyPair"
 
 	// ExpandPrivateKey is the client's private key seed KDF dst.
 	ExpandPrivateKey = "PrivateKey"
-
-	// 3DH tags.
-
-	// VersionTag indicates the protocol RFC identifier for the AKE transcript prefix.
-	VersionTag = "OPAQUEv1-"
-
-	// LabelPrefix is the 3DH secret KDF dst prefix.
-	LabelPrefix = "OPAQUE-"
-
-	// Handshake is the 3DH HandshakeSecret dst.
-	Handshake = "HandshakeSecret"
-
-	// SessionKey is the 3DH session secret dst.
-	SessionKey = "SessionKey"
-
-	// MacServer is 3DH server's MAC key KDF dst.
-	MacServer = "ServerMAC"
-
-	// MacClient is 3DH server's MAC key KDF dst.
-	MacClient = "ClientMAC"
-
-	// Client tags.
-
-	// CredentialResponsePad is the masking keys KDF dst to expand to the input.
-	CredentialResponsePad = "CredentialResponsePad"
 
 	// Server tags.
 

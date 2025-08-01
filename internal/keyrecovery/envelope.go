@@ -55,10 +55,6 @@ func (e *Envelope) DeserializeEnvelope(data []byte, c *internal.Configuration) (
 	return env, nil
 }
 
-func exportKey(conf *internal.Configuration, randomizedPassword, nonce []byte) []byte {
-	return conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExportKey), conf.KDF.Size())
-}
-
 func authTag(conf *internal.Configuration, randomizedPassword, nonce, ctc []byte) []byte {
 	authKey := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
 	return conf.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
@@ -87,58 +83,4 @@ func deriveDiffieHellmanKeyPair(
 ) (*ecc.Scalar, *ecc.Element) {
 	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
 	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
-}
-
-// Store returns the client's Envelope, the masking key for the registration, and the additional export key.
-func Store(
-	conf *internal.Configuration,
-	randomizedPassword []byte, serverPublicKey *ecc.Element,
-	credentials *Credentials,
-) (env *Envelope, pku *ecc.Element, export []byte) {
-	// testing: integrated to support testing with set nonce
-	nonce := credentials.EnvelopeNonce
-	if nonce == nil { // TODO: is this needed?
-		nonce = internal.RandomBytes(conf.NonceLen)
-	}
-
-	_, pku = deriveDiffieHellmanKeyPair(conf, randomizedPassword, nonce)
-	ctc := cleartextCredentials(
-		pku.Encode(),
-		serverPublicKey.Encode(),
-		credentials.ClientIdentity,
-		credentials.ServerIdentity,
-	)
-	auth := authTag(conf, randomizedPassword, nonce, ctc)
-	export = exportKey(conf, randomizedPassword, nonce)
-
-	env = &Envelope{
-		Nonce:   nonce,
-		AuthTag: auth,
-	}
-
-	return env, pku, export
-}
-
-// Recover returns the client's private and public key, as well as the secret export key.
-func Recover(
-	conf *internal.Configuration,
-	randomizedPassword, serverPublicKey, clientIdentity, serverIdentity []byte,
-	envelope *Envelope,
-) (clientSecretKey *ecc.Scalar, clientPublicKey *ecc.Element, export []byte, err error) {
-	clientSecretKey, clientPublicKey = deriveDiffieHellmanKeyPair(conf, randomizedPassword, envelope.Nonce)
-	ctc := cleartextCredentials(
-		clientPublicKey.Encode(),
-		serverPublicKey,
-		clientIdentity,
-		serverIdentity,
-	)
-
-	expectedTag := authTag(conf, randomizedPassword, envelope.Nonce, ctc)
-	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, errEnvelopeInvalidMac
-	}
-
-	export = exportKey(conf, randomizedPassword, envelope.Nonce)
-
-	return clientSecretKey, clientPublicKey, export, nil
 }
